@@ -5,15 +5,20 @@
     "main": "index.js",
     "type": "module",
     "scripts": {
-        "start": "node ./index.js",
-        "start:dev": "nodemon ./index.js",
+        "start": "tsx ./index.ts",
+        "start:dev": "tsx watch ./index.ts",
+        "server:start": "tsx ./src/ws_server/index.ts",
+        "server:dev": "tsx watch ./src/ws_server/index.ts",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "Andrei Auchynnikau",
     "keywords": [],
     "license": "ISC",
     "devDependencies": {
-        "nodemon": "^2.0.16"
+        "@types/ws": "^8.5.10",
+        "nodemon": "^3.0.3",
+        "tsx": "^4.7.1",
+        "typescript": "^5.3.3"
     },
     "dependencies": {
         "ws": "^8.8.0"
