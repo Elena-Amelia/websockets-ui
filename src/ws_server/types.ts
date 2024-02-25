@@ -15,15 +15,22 @@ export type regDataType = {
     password: string;
 }
 
-export type roomsDataType = {
+export type roomType = {
         roomId: string;
-        roomUsers: object[];
-    //      [
-    //       {  name: user1,
-    //          index: user1Index,
-    //       }, 
-    //   ],
+        roomUsers: roomUsersType[];
    }
+
+   type roomUsersType = {
+    name: string;
+    index: string | number;
+   }
+
+export   type gameType = {
+    idGame: string;
+    idPlayer1: string | number;
+    idPlayer2: string | number;
+}
+
 
    export type winnersDataType = {
         name: string;
