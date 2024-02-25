@@ -1,5 +1,5 @@
 import {WebSocketServer, WebSocket} from "ws";
-import { UserType, gameType, roomType } from "./types";
+import { UserType, currentGameType, gameType, roomType } from "./types";
 import { randomUUID } from "node:crypto";
 
 
@@ -10,6 +10,7 @@ let users: UserType[] = [];
 let rooms: roomType[] = [];
 let winners: object[] = [];
 let games: gameType[] = [];
+let currentGame: currentGameType[] = [];
 
 class MyWebsocket extends WebSocket {
    id: string | number;
@@ -136,10 +137,36 @@ wsServer.on("connection", (ws: MyWebsocket) => {
         })
         }
         }
+      })
+    } else if (request.type === 'add_ships') {
+
+        let shipsData = JSON.parse(request.data.toString());
+        currentGame.push(shipsData);
+         console.log(currentGame);
+
+         wsServer.clients.forEach(client => {   //отправляем start_game 'правильным' игрокам
+    
+            for (let key in client ) {
+                if (key === 'id') {
+    
+            currentGame.forEach(elem => {
+                if ( client[key] === elem.indexPlayer) {
+                        client.send(JSON.stringify({
+                        type: "start_game",
+                        data: JSON.stringify({ ships: elem.ships, currentPlayerIndex: elem.indexPlayer } ),
+                        id:0,
+                        }));
+                    } 
+                })
+            }
+            }
+          })
+     }
+      
+        
+    
     })
-    } 
 
 
-})
 });
 

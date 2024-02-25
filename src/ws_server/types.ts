@@ -31,7 +31,11 @@ export   type gameType = {
     idPlayer2: string | number;
 }
 
-
+export   type currentGameType = {
+    gameId: string;
+    ships: {};
+    indexPlayer: string | number;
+}
    export type winnersDataType = {
         name: string;
         wins: number;
