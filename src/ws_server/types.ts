@@ -15,29 +15,50 @@ export type regDataType = {
     password: string;
 }
 
-export type roomType = {
-        roomId: string;
-        roomUsers: roomUsersType[];
+export type RoomType = {
+        roomId: string | number;
+        roomUsers: RoomUsersType[];
    }
 
-   type roomUsersType = {
+   type RoomUsersType = {
     name: string;
     index: string | number;
    }
 
-export   type gameType = {
-    idGame: string;
+export type GameType = {
+    idGame: string | number;
     idPlayer1: string | number;
     idPlayer2: string | number;
 }
 
-export   type currentGameType = {
-    gameId: string;
-    ships: {};
+export type CurrentGameType = {
+    gameId: string | number;
+    ships: ShipType[];
     indexPlayer: string | number;
 }
-   export type winnersDataType = {
+
+export type UserShipsType = {
+    ships: ShipCoord[];
+    shipLength: number;
+    gameId: string | number;
+    indexPlayer: string | number;
+}
+export type ShipCoord = {
+    x: number;
+    y: number;
+}
+   export type ShipType = {
+    position: { x: number;
+        y: number; };
+    
+    direction: boolean;
+    type: string;
+    length: number;
+   }
+
+   export type WinnersDataType = {
         name: string;
         wins: number;
 
    }
+
