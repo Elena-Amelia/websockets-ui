@@ -10,20 +10,18 @@ import {
   ShipCoord,
   WinnersDataType,
   InvalidCeils,
-  Coord,
 } from "./types";
 import { randomUUID } from "node:crypto";
 import {
-  isArrIncludesTwice,
   getFirstPlayerId,
   isGameOver,
   getVictim,
   getNearbyCoords,
   getShotCoords,
-  cleanArr,
   getAnswer,
   updateWinners,
 } from "./helpers";
+import { isArrIncludesTwice, cleanArr } from "./utils";
 
 export const wsServer = new WebSocketServer({ port: 3000 });
 console.log("WS server started by ws://localhost:3000/");
@@ -55,7 +53,6 @@ wsServer.on("connection", (ws: MyWebsocket) => {
 
       clients.forEach((client) => {
         if (client.name === regData.name) {
-
           ws.send(
             JSON.stringify({
               type: "reg",
@@ -75,7 +72,6 @@ wsServer.on("connection", (ws: MyWebsocket) => {
 
       if (!isFound) {
         users.forEach((user, ind) => {
-  
           if (
             user.name === regData.name &&
             user.password === regData.password
@@ -140,8 +136,6 @@ wsServer.on("connection", (ws: MyWebsocket) => {
       }
 
       if (!isFound) {
-
-
         users.push({
           name: regData.name,
           password: regData.password,
@@ -182,7 +176,6 @@ wsServer.on("connection", (ws: MyWebsocket) => {
           })
         );
         console.log(`reg: ${regData.name} is connected`);
-
       }
     } else if (request.type === "create_room") {
       const roomRandId = randomUUID();
@@ -215,6 +208,7 @@ wsServer.on("connection", (ws: MyWebsocket) => {
           );
         }
       });
+      console.log(`create_room: room ${roomRandId} is created`);
     } else if (request.type === "add_user_to_room") {
       const gameId: { indexRoom: string | number } = JSON.parse(
         request.data.toString()
@@ -234,6 +228,21 @@ wsServer.on("connection", (ws: MyWebsocket) => {
               });
 
               rooms.splice(ind, 1); // удалили эту комнату
+            }
+          });
+
+          //УДАЛЯЕМ КОМНАТЫ, С ИГРОКАМИ ЗАШЕДШИМИ В ИГРУ
+          games.forEach((game) => {
+            if (gameId.indexRoom === game.idGame) {
+              for (let i = 0; i < rooms.length; i++) {
+                if (
+                  rooms[i].roomUsers[0].index === game.idPlayer1 ||
+                  rooms[i].roomUsers[0].index === game.idPlayer2
+                ) {
+                  rooms.splice(ind, 1);
+                }
+                i--;
+              }
             }
           });
 
@@ -278,6 +287,7 @@ wsServer.on("connection", (ws: MyWebsocket) => {
           });
         }
       });
+      console.log(`add_user_to_room: game ${gameId.indexRoom} is created`);
     } else if (request.type === "add_ships") {
       const shipsData = JSON.parse(request.data.toString());
 
@@ -362,6 +372,7 @@ wsServer.on("connection", (ws: MyWebsocket) => {
           }
         }
       });
+      console.log(`add_ships: ships are added, game ${gameId} is started`);
     } else if (request.type === "attack") {
       const attackData = JSON.parse(request.data.toString());
 
@@ -452,6 +463,7 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                           }
                         });
                         checker = true;
+                        console.log(`attack: the ship is shot`);
                         break upper;
                       } else if (userShips[j].shipLength === 1) {
                         //УБИЛИ
@@ -541,7 +553,7 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                           (elem) => elem === userShips[j]
                         );
                         userShips.splice(ind, 1);
-
+                        console.log(`attack: the ship is killed`);
                         //проверка на окончание игры
                         const gameOver = isGameOver(
                           games,
@@ -550,22 +562,30 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                         );
                         if (gameOver) {
                           updateWinners(users, attackData.indexPlayer, winners);
-                    
+
+                          console.log(
+                            `attack: game over, the winner is ${attackData.indexPlayer}`
+                          );
 
                           wsServer.clients.forEach((client) => {
                             for (let key in client) {
                               if (key === "id") {
                                 games.forEach((game) => {
                                   if (game.idGame === attackData.gameId) {
-                                    client.send(
-                                      JSON.stringify({
-                                        type: "finish",
-                                        data: JSON.stringify({
-                                          winPlayer: attackData.indexPlayer,
-                                        }),
-                                        id: 0,
-                                      })
-                                    );
+                                    if (
+                                      client[key] === game.idPlayer1 ||
+                                      client[key] === game.idPlayer2
+                                    ) {
+                                      client.send(
+                                        JSON.stringify({
+                                          type: "finish",
+                                          data: JSON.stringify({
+                                            winPlayer: attackData.indexPlayer,
+                                          }),
+                                          id: 0,
+                                        })
+                                      );
+                                    }
                                   }
                                 });
 
@@ -631,6 +651,7 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                     }
                   }
                 });
+                console.log(`attack: ship isn't hit`);
               }
             }
           }
@@ -766,7 +787,6 @@ wsServer.on("connection", (ws: MyWebsocket) => {
 
         games.splice(luckyGameInd, 1);
         clients.splice(ind, 1);
-        console.log(users);
       }
     });
   });

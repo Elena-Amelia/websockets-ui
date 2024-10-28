@@ -7,14 +7,6 @@ import {
   ShipCoord,
 } from "./types";
 
-export function isArrIncludesTwice(
-  arr: CurrentGameType[],
-  id: string | number
-) {
-  let result = arr.filter((arrShips) => arrShips.gameId === id);
-  if (result.length === 2) return true;
-}
-
 export function getFirstPlayerId(
   gamesArr: GameType[],
   currGame: CurrentGameType
@@ -128,15 +120,6 @@ export function getNearbyCoords(arr: UserShipsType) {
   return resultArr;
 }
 
-export function cleanArr(arr, id) {
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i].gameId === id || arr[i].idGame === id) {
-      arr.splice(i, 1);
-      i--;
-    }
-  }
-}
-
 export function getAnswer(arr, data) {
   let result;
   if (arr.length === 0) {
@@ -159,7 +142,6 @@ export function getAnswer(arr, data) {
 }
 
 export function updateWinners(usersArr, id, winnersArr) {
-  let wins = 1;
   let winnerName = "";
 
   usersArr.forEach((user) => {
@@ -168,14 +150,22 @@ export function updateWinners(usersArr, id, winnersArr) {
     }
   });
 
-  winnersArr.forEach((winner) => {
-    if (winner.name === winnerName) {
-      wins = winner.wins;
+  if (winnersArr.length === 0) {
+    winnersArr.push({
+      name: winnerName,
+      wins: 1,
+    });
+  } else {
+    for (let i = 0; i < winnersArr.length; i++) {
+      if (winnersArr[i].name === winnerName) {
+        winnersArr[i].wins = winnersArr[i].wins + 1;
+        break;
+      } else {
+        winnersArr.push({
+          name: winnerName,
+          wins: 1,
+        });
+      }
     }
-  });
-
-  winnersArr.push({
-    name: winnerName,
-    wins: wins++,
-  });
+  }
 }
