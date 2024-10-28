@@ -71,9 +71,9 @@ export function isGameOver(gamesArr: GameType[], data, userShipsArr) {
   });
 
   if (isPlayer1 && isPlayer2) {
-    return true;
-  } else {
     return false;
+  } else {
+    return true;
   }
 }
 
@@ -143,7 +143,11 @@ export function getAnswer(arr, data) {
     result = false;
   } else {
     for (let i = 0; i < arr.length; i++) {
-      if (arr[i].x === data.x && arr[i].y === data.y && arr[i].player === data.indexPlayer) {
+      if (
+        arr[i].x === data.x &&
+        arr[i].y === data.y &&
+        arr[i].player === data.indexPlayer
+      ) {
         result = true;
         break;
       } else {
@@ -152,4 +156,26 @@ export function getAnswer(arr, data) {
     }
   }
   return result;
+}
+
+export function updateWinners(usersArr, id, winnersArr) {
+  let wins = 1;
+  let winnerName = "";
+
+  usersArr.forEach((user) => {
+    if (user.index === id) {
+      winnerName = user.name;
+    }
+  });
+
+  winnersArr.forEach((winner) => {
+    if (winner.name === winnerName) {
+      wins = winner.wins;
+    }
+  });
+
+  winnersArr.push({
+    name: winnerName,
+    wins: wins++,
+  });
 }

@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import {
   UserType,
+  ClientType,
   CurrentGameType,
   GameType,
   RoomType,
@@ -8,6 +9,7 @@ import {
   UserShipsType,
   ShipCoord,
   WinnersDataType,
+  InvalidCeils,
   Coord,
 } from "./types";
 import { randomUUID } from "node:crypto";
@@ -20,19 +22,20 @@ import {
   getShotCoords,
   cleanArr,
   getAnswer,
+  updateWinners,
 } from "./helpers";
 
 export const wsServer = new WebSocketServer({ port: 3000 });
 console.log("WS server started by ws://localhost:3000/");
 
-let users: UserType[] = [];
-let rooms: RoomType[] = [];
-let winners: WinnersDataType[] = [];
-let games: GameType[] = [];
-let currentGame: CurrentGameType[] = [];
-let userShips: UserShipsType[] = [];
-let invalidCells: Coord[] = [];
-//СВОИ КОРАБЛИ, РАСПИСАННЫЕ ПО КЛЕТОЧКАМ
+const users: UserType[] = [];
+const clients: ClientType[] = [];
+const rooms: RoomType[] = [];
+const winners: WinnersDataType[] = [];
+const games: GameType[] = [];
+const currentGame: CurrentGameType[] = [];
+const userShips: UserShipsType[] = [];
+const invalidCells: InvalidCeils[] = [];
 
 class MyWebsocket extends WebSocket {
   id: string | number;
@@ -40,47 +43,147 @@ class MyWebsocket extends WebSocket {
 
 wsServer.on("connection", (ws: MyWebsocket) => {
   ws.id = randomUUID();
+  const wsID = ws.id;
 
   ws.on("message", (message) => {
     let request = JSON.parse(message.toString());
 
+    let isFound = false;
+
     if (request.type === "reg") {
       const regData = JSON.parse(request.data.toString());
 
-      users.push({
-        name: regData.name,
-        password: regData.password,
-        index: ws.id,
+      clients.forEach((client) => {
+        if (client.name === regData.name) {
+
+          ws.send(
+            JSON.stringify({
+              type: "reg",
+              data: JSON.stringify({
+                name: client.name,
+                index: client.index,
+                error: true,
+                errorText: "You are already logged in",
+              }),
+              id: 0,
+            })
+          );
+          isFound = true;
+          console.log(`reg: ${regData.name} is already logged in`);
+        }
       });
 
-      ws.send(
-        JSON.stringify({
-          type: "reg",
-          data: JSON.stringify({
-            name: users[users.length - 1].name,
-            index: users[users.length - 1].index,
-            error: false,
-            errorText: "",
-          }),
-          id: 0,
-        })
-      );
+      if (!isFound) {
+        users.forEach((user, ind) => {
+  
+          if (
+            user.name === regData.name &&
+            user.password === regData.password
+          ) {
+            user.index = ws.id;
 
-      ws.send(
-        JSON.stringify({
-          type: "update_room",
-          data: JSON.stringify(rooms),
-          id: 0,
-        })
-      );
+            clients.push({
+              name: user.name,
+              index: user.index,
+            });
 
-      ws.send(
-        JSON.stringify({
-          type: "update_winners",
-          data: JSON.stringify(winners),
-          id: 0,
-        })
-      );
+            ws.send(
+              JSON.stringify({
+                type: "reg",
+                data: JSON.stringify({
+                  name: users[ind].name,
+                  index: users[ind].index,
+                  error: false,
+                  errorText: "",
+                }),
+                id: 0,
+              })
+            );
+
+            ws.send(
+              JSON.stringify({
+                type: "update_room",
+                data: JSON.stringify(rooms),
+                id: 0,
+              })
+            );
+
+            ws.send(
+              JSON.stringify({
+                type: "update_winners",
+                data: JSON.stringify(winners),
+                id: 0,
+              })
+            );
+            isFound = true;
+            console.log(`reg: ${regData.name} is connected`);
+          } else if (
+            user.name === regData.name &&
+            user.password !== regData.password
+          ) {
+            ws.send(
+              JSON.stringify({
+                type: "reg",
+                data: JSON.stringify({
+                  name: users[users.length - 1].name,
+                  index: users[users.length - 1].index,
+                  error: true,
+                  errorText: "Wrong password",
+                }),
+                id: 0,
+              })
+            );
+            isFound = true;
+            console.log(`reg: ${regData.name} isn't connected`);
+          }
+        });
+      }
+
+      if (!isFound) {
+
+
+        users.push({
+          name: regData.name,
+          password: regData.password,
+          index: ws.id,
+        });
+
+        clients.push({
+          name: regData.name,
+          index: ws.id,
+        });
+
+        ws.send(
+          JSON.stringify({
+            type: "reg",
+            data: JSON.stringify({
+              name: users[users.length - 1].name,
+              index: users[users.length - 1].index,
+              error: false,
+              errorText: "",
+            }),
+            id: 0,
+          })
+        );
+
+        ws.send(
+          JSON.stringify({
+            type: "update_room",
+            data: JSON.stringify(rooms),
+            id: 0,
+          })
+        );
+
+        ws.send(
+          JSON.stringify({
+            type: "update_winners",
+            data: JSON.stringify(winners),
+            id: 0,
+          })
+        );
+        console.log(`reg: ${regData.name} is connected`);
+
+      }
     } else if (request.type === "create_room") {
       const roomRandId = randomUUID();
 
@@ -144,7 +247,6 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                 })
               );
             }
-            // обновили список комнат, удалив активную, и всем разослали
           });
 
           wsServer.clients.forEach((client) => {
@@ -270,12 +372,31 @@ wsServer.on("connection", (ws: MyWebsocket) => {
           } else {
             const ans = getAnswer(invalidCells, attackData);
             if (ans) {
-              return;
+              wsServer.clients.forEach((client) => {
+                for (let key in client) {
+                  if (key === "id") {
+                    games.forEach((game) => {
+                      if (game.idGame === attackData.gameId) {
+                        client.send(
+                          JSON.stringify({
+                            type: "turn",
+                            data: JSON.stringify({
+                              currentPlayer: attackData.indexPlayer,
+                            }),
+                            id: 0,
+                          })
+                        );
+                      }
+                    });
+                  }
+                }
+              });
             } else {
               invalidCells.push({
                 x: attackData.x,
                 y: attackData.y,
                 player: attackData.indexPlayer,
+                gameId: attackData.gameId,
               });
 
               const victim = getVictim(games, attackData);
@@ -336,23 +457,14 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                         //УБИЛИ
 
                         const arrKilled = getShotCoords(userShips[j].ships);
-                        let arrMissed: Coord[] = [];
-
-                        if (userShips[j].type === "small") {
-                          arrMissed = getNearbyCoords(userShips[j]);
-                        } else if (userShips[j].type === "medium") {
-                          arrMissed = getNearbyCoords(userShips[j]);
-                        } else if (userShips[j].type === "large") {
-                          arrMissed = getNearbyCoords(userShips[j]);
-                        } else if (userShips[j].type === "huge") {
-                          arrMissed = getNearbyCoords(userShips[j]);
-                        }
+                        const arrMissed = getNearbyCoords(userShips[j]);
 
                         arrMissed.forEach((elem) => {
                           invalidCells.push({
                             x: elem.x,
                             y: elem.y,
                             player: attackData.indexPlayer,
+                            gameId: attackData.gameId,
                           });
                         });
 
@@ -436,27 +548,9 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                           attackData,
                           userShips
                         );
-                        if (!gameOver) {
-                          //нашли победителя, обновили победы
-                          let wins = 1;
-                          let winnerName = "";
-
-                          users.forEach((user) => {
-                            if (user.index === attackData.indexPlayer) {
-                              winnerName = user.name;
-                            }
-                          });
-
-                          winners.forEach((winner) => {
-                            if (winner.name === winnerName) {
-                              wins = winner.wins;
-                            }
-                          });
-
-                          winners.push({
-                            name: winnerName,
-                            wins: wins++,
-                          });
+                        if (gameOver) {
+                          updateWinners(users, attackData.indexPlayer, winners);
+                    
 
                           wsServer.clients.forEach((client) => {
                             for (let key in client) {
@@ -487,14 +581,11 @@ wsServer.on("connection", (ws: MyWebsocket) => {
                           });
                           //УДАЛИЛИ ИГРУ
                           cleanArr(games, attackData.gameId);
-
                           //УДАЛИЛИ В GURRENT GAMES
                           cleanArr(currentGame, attackData.gameId);
-
                           //УДАЛИЛИ В USERSHIPS
                           cleanArr(userShips, attackData.gameId);
-
-                          // console.log(games, currentGame, userShips);
+                          cleanArr(invalidCells, attackData.gameId);
                         }
 
                         checker = true;
@@ -547,8 +638,136 @@ wsServer.on("connection", (ws: MyWebsocket) => {
       });
     } else if (request.type === "randomAttack") {
       const randAttackData = JSON.parse(request.data.toString());
-
-      // console.log(randAttackData);
     }
+  });
+
+  ws.on("close", (ws: MyWebsocket) => {
+    clients.forEach((client, ind) => {
+      if (client.index === wsID) {
+        console.log(`disconnect: ${client.name} is disconnected`);
+
+        //удаляем комнаты с ушедшим игроком
+
+        for (let i = 0; i < rooms.length; i++) {
+          if (rooms[i].roomUsers[0].name === client.name) {
+            rooms.splice(ind, 1);
+            i--;
+          }
+          wsServer.clients.forEach((client) => {
+            if (client.readyState === 1) {
+              client.send(
+                JSON.stringify({
+                  type: "update_room",
+                  data: JSON.stringify(rooms),
+                  id: 0,
+                })
+              );
+            }
+          });
+        }
+
+        //УДАЛЯЕМ ИГРЫ С УШЕДШИМ ИГРОКОМ И ОТСЫЛАЕМ WIN ОСТАВШЕМУСЯ
+
+        let luckyWinner: number | string = "";
+        let luckyGameInd: number = 0;
+
+        games.forEach((game, ind) => {
+          if (game.idPlayer1 === client.index) {
+            luckyWinner = game.idPlayer2;
+            updateWinners(users, luckyWinner, winners);
+            luckyGameInd = ind;
+            wsServer.clients.forEach((client) => {
+              for (let key in client) {
+                if (key === "id") {
+                  if (client[key] === luckyWinner) {
+                    currentGame.forEach((currGame) => {
+                      if (client[key] === currGame.indexPlayer) {
+                        client.send(
+                          JSON.stringify({
+                            type: "start_game",
+                            data: JSON.stringify({
+                              ships: currGame.ships,
+                              currentPlayerIndex: currGame.indexPlayer,
+                            }),
+                            id: 0,
+                          })
+                        );
+                      }
+                    });
+
+                    client.send(
+                      JSON.stringify({
+                        type: "finish",
+                        data: JSON.stringify({
+                          winPlayer: luckyWinner,
+                        }),
+                        id: 0,
+                      })
+                    );
+                  }
+
+                  client.send(
+                    JSON.stringify({
+                      type: "update_winners",
+                      data: JSON.stringify(winners),
+                      id: 0,
+                    })
+                  );
+                }
+              }
+            });
+          } else if (game.idPlayer2 === client.index) {
+            luckyWinner = game.idPlayer1;
+            updateWinners(users, luckyWinner, winners);
+            luckyGameInd = ind;
+
+            wsServer.clients.forEach((client) => {
+              for (let key in client) {
+                if (key === "id") {
+                  if (client[key] === luckyWinner) {
+                    currentGame.forEach((currGame) => {
+                      if (client[key] === currGame.indexPlayer) {
+                        client.send(
+                          JSON.stringify({
+                            type: "start_game",
+                            data: JSON.stringify({
+                              ships: currGame.ships,
+                              currentPlayerIndex: currGame.indexPlayer,
+                            }),
+                            id: 0,
+                          })
+                        );
+                      }
+                    });
+
+                    client.send(
+                      JSON.stringify({
+                        type: "finish",
+                        data: JSON.stringify({
+                          winPlayer: luckyWinner,
+                        }),
+                        id: 0,
+                      })
+                    );
+                  }
+
+                  client.send(
+                    JSON.stringify({
+                      type: "update_winners",
+                      data: JSON.stringify(winners),
+                      id: 0,
+                    })
+                  );
+                }
+              }
+            });
+          }
+        });
+
+        games.splice(luckyGameInd, 1);
+        clients.splice(ind, 1);
+        console.log(users);
+      }
+    });
   });
 });

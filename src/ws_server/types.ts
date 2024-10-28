@@ -3,7 +3,10 @@ export type UserType = {
   password: string;
   index: string | number;
 };
-
+export type ClientType = {
+  name: string;
+  index: string | number;
+};
 export type responseType = {
   type: string;
   data: regDataType;
@@ -68,5 +71,10 @@ export type Coord = {
     x: number;
     y: number;
     player?: string|number
-
+  };
+  export type InvalidCeils = {
+    x: number;
+    y: number;
+    player: string|number;
+    gameId: string|number;
   };
